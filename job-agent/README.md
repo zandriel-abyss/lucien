@@ -35,33 +35,49 @@ job-agent/
    - Windows (PowerShell): `python -m venv .venv`
 2. Activate it:
    - macOS/Linux: `source .venv/bin/activate`
-   - Windows (PowerShell): `.venv\\Scripts\\Activate.ps1`
+   - Windows (PowerShell): `.venv\Scripts\Activate.ps1`
 3. Install dependencies:
    - `pip install -r requirements.txt`
-4. Create `.env` file in `job-agent/`:
+4. Copy `.env.example` to `.env` in `job-agent/` and set:
    - `ANTHROPIC_API_KEY=your_key_here`
 5. Run app:
    - `streamlit run app.py`
 
 If `ANTHROPIC_API_KEY` is missing, the app still works with a built-in mock generator so you can test the flow.
 
-## MVP Flow
+## Features
+
+### Core
 
 1. Add job details (title/company/location/JD/questions/URL).
 2. Auto-classify role category.
 3. Auto-score fit (0-100) and recommendation.
 4. Suggest resume mode (`general`, `regtech`, `hybrid`).
 5. Generate tailored draft package:
-   - headline
-   - summary
-   - skills
-   - experience bullets
+   - role strategy
+   - tailored resume content
    - cover letter
    - application answers
-   - optional follow-up email
-6. Save generated markdown in `outputs/`.
-7. Track status in SQLite (`Saved`, `Drafted`, `Applied`, `Interviewing`, `Rejected`, `Offer`, `Archived`).
-8. Export tracker as CSV.
+   - interview prep
+6. Track status in SQLite (`Saved`, `Drafted`, `Applied`, `Interviewing`, `Rejected`, `Offer`, `Archived`).
+7. Export tracker as CSV.
+
+### Refinements
+
+- **Role strategy output** for positioning Zack per role.
+- **Interview prep output** including:
+  - likely interview questions
+  - 3 STAR stories to use
+  - key metrics to mention
+  - questions to ask interviewer
+- **Editable generated outputs** in the Outputs page before saving/exporting.
+- **Markdown exports** for:
+  - resume version
+  - cover letter
+  - application answers
+  - role strategy
+  - interview prep
+- **Status timeline notes** per job via a dedicated tracker timeline table.
 
 ## Sample Job Input
 
