@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Senior Fintech/Product Job Assistant</h1>
+
+<div class="card">
+  <h2>Dashboard</h2>
+  {% for key, value in status_counts.items() %}
+  <span class="pill">{{ key }}: {{ value }}</span>
+  {% endfor %}
+  <p><a href="/export.csv">Export tracker CSV</a></p>
+</div>
+
+<div class="card">
+  <h2>Add Job (link or manual JD)</h2>
+  <p><strong>Quick intake from URL</strong></p>
+  <form action="/jobs/add-from-url" method="post">
+    <div class="row">
+      <input name="job_url" placeholder="https://company.com/jobs/role" required />
+      <input name="source" placeholder="Source (LinkedIn, referral, etc.)" />
+      <button type="submit">Fetch and Save</button>
+    </div>
+  </form>
+  <hr />
+  <p><strong>Manual intake</strong></p>
+  <form action="/jobs/add" method="post">
+    <div class="row">
+      <input name="company" placeholder="Company" required />
+      <input name="title" placeholder="Title" required />
+      <input name="location" placeholder="Location" />
+      <input name="job_url" placeholder="Job URL" />
+      <input name="source" placeholder="Source (LinkedIn, referral, etc.)" />
+    </div>
+    <p></p>
+    <textarea name="job_description" placeholder="Paste full job description here..." required></textarea>
+    <p><button type="submit">Save Job</button></p>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Jobs</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Company</th>
+        <th>Role</th>
+        <th>Location</th>
+        <th>Fit</th>
+        <th>Recommendation</th>
+        <th>Status</th>
+        <th>Added</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for job in jobs %}
+      <tr>
+        <td><a href="/jobs/{{ job.id }}">{{ job.company }}</a></td>
+        <td>{{ job.title }}</td>
+        <td>{{ job.location }}</td>
+        <td>{{ job.fit_score if job.fit_score is not none else "-" }}</td>
+        <td>{{ job.fit_recommendation if job.fit_recommendation else "-" }}</td>
+        <td>{{ job.status.value }}</td>
+        <td>{{ job.date_added }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
