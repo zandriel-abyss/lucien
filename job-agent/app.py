@@ -59,6 +59,9 @@ if "generated_sections" not in st.session_state:
 if "ingested_jobs" not in st.session_state:
     st.session_state["ingested_jobs"] = []
 
+mode_label = "Live API" if st.session_state["generator"].api_available else "Mock only"
+st.info(f"Generation mode capability: {mode_label}")
+
 
 def parse_questions(raw: str) -> List[str]:
     if not raw:
@@ -98,6 +101,8 @@ def _build_job_payload(company: str, title: str, location: str, job_url: str, so
         "recruiter_name": recruiter,
         "notes": notes,
         "generated_files": "",
+        "last_generation_mode": None,
+        "last_generation_error": None,
     }
 
 
@@ -141,7 +146,7 @@ def render_dashboard() -> None:
 
     view = view.sort_values(by=["fit_score", "id"], ascending=[False, False])
     st.dataframe(
-        view[["id", "company", "title", "location", "source", "category", "fit_score", "recommendation", "resume_mode", "status", "date_added"]],
+        view[["id", "company", "title", "location", "source", "category", "fit_score", "recommendation", "resume_mode", "last_generation_mode", "status", "date_added"]],
         use_container_width=True,
     )
 
@@ -291,6 +296,9 @@ def render_job_detail() -> None:
     st.write(f"**Category:** {job.get('category') or '-'}")
     st.write(f"**Fit Score:** {job.get('fit_score') or 0} ({job.get('recommendation') or 'N/A'})")
     st.write(f"**Recommended Resume Mode:** {job.get('resume_mode') or 'general'}")
+    st.write(f"**Last generation mode:** {job.get('last_generation_mode') or 'not-run'}")
+    if job.get("last_generation_error"):
+        st.warning(f"Last generation warning: {job['last_generation_error']}")
 
     fit = score_fit(job.get("title") or "", job.get("location") or "", job.get("job_description") or "", job.get("category") or "General Leadership")
     ats = ats_coverage_report(job.get("job_description") or "")
@@ -374,8 +382,18 @@ def render_job_detail() -> None:
             sections = st.session_state["generator"].generate_package(role_context, mode, questions)
 
         st.session_state["generated_sections"][job_id] = sections
-        update_job(job_id, {"resume_mode": mode, "status": "Drafted" if job.get("status") == "Saved" else job.get("status")})
+        update_job(
+            job_id,
+            {
+                "resume_mode": mode,
+                "status": "Drafted" if job.get("status") == "Saved" else job.get("status"),
+                "last_generation_mode": st.session_state["generator"].last_generation_mode,
+                "last_generation_error": st.session_state["generator"].last_generation_error or None,
+            },
+        )
         add_timeline_note(job_id, "Drafted", "Generated new draft package")
+        if st.session_state["generator"].last_generation_mode == "mock":
+            st.warning("Generation used mock fallback. Check API key/configuration for live output.")
         st.success("Generated draft sections. Review and export from Outputs page.")
 
 
@@ -484,7 +502,16 @@ def render_apply_assistant() -> None:
             existing_answers = sections.get("application_answers", "")
             sections["application_answers"] = (existing_answers + "\n\n" + out.get("application_answers", "")).strip()
             st.session_state["generated_sections"][job["id"]] = sections
+            update_job(
+                job["id"],
+                {
+                    "last_generation_mode": st.session_state["generator"].last_generation_mode,
+                    "last_generation_error": st.session_state["generator"].last_generation_error or None,
+                },
+            )
             add_timeline_note(job["id"], job.get("status") or "Drafted", "Generated additional portal question answers")
+            if st.session_state["generator"].last_generation_mode == "mock":
+                st.warning("Additional answers used mock fallback due to API error/configuration.")
             st.success("Additional answers appended to Application Answers section.")
 
     if st.button("Mark as Applied Now"):

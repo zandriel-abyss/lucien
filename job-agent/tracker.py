@@ -39,7 +39,9 @@ def init_db() -> None:
                 follow_up_date TEXT,
                 recruiter_name TEXT,
                 notes TEXT,
-                generated_files TEXT
+                generated_files TEXT,
+                last_generation_mode TEXT,
+                last_generation_error TEXT
             )
             """
         )
@@ -55,6 +57,14 @@ def init_db() -> None:
             )
             """
         )
+        cols = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(jobs)").fetchall()
+        }
+        if "last_generation_mode" not in cols:
+            conn.execute("ALTER TABLE jobs ADD COLUMN last_generation_mode TEXT")
+        if "last_generation_error" not in cols:
+            conn.execute("ALTER TABLE jobs ADD COLUMN last_generation_error TEXT")
 
 
 def add_job(payload: Dict[str, object]) -> int:
@@ -82,6 +92,8 @@ def add_job(payload: Dict[str, object]) -> int:
         "recruiter_name",
         "notes",
         "generated_files",
+        "last_generation_mode",
+        "last_generation_error",
     ]
 
     values = [payload.get(f) for f in fields]

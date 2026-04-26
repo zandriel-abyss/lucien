@@ -25,6 +25,8 @@ class GeneratorService:
     def __init__(self) -> None:
         self.api_key = os.getenv("ANTHROPIC_API_KEY")
         self.client = Anthropic(api_key=self.api_key) if self.api_key else None
+        self.last_generation_mode = "mock"
+        self.last_generation_error = ""
 
     @property
     def api_available(self) -> bool:
@@ -39,10 +41,16 @@ class GeneratorService:
         if self.client:
             try:
                 full = self._generate_with_claude(role_context, resume_mode, questions)
-            except Exception:
+                self.last_generation_mode = "live"
+                self.last_generation_error = ""
+            except Exception as exc:
                 full = self._generate_mock(role_context, resume_mode, questions)
+                self.last_generation_mode = "mock"
+                self.last_generation_error = str(exc)
         else:
             full = self._generate_mock(role_context, resume_mode, questions)
+            self.last_generation_mode = "mock"
+            self.last_generation_error = "ANTHROPIC_API_KEY missing"
         return split_sections(full)
 
     def _generate_with_claude(
