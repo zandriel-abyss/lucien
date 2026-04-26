@@ -37,7 +37,10 @@ class GeneratorService:
         questions: List[str],
     ) -> Dict[str, str]:
         if self.client:
-            full = self._generate_with_claude(role_context, resume_mode, questions)
+            try:
+                full = self._generate_with_claude(role_context, resume_mode, questions)
+            except Exception:
+                full = self._generate_mock(role_context, resume_mode, questions)
         else:
             full = self._generate_mock(role_context, resume_mode, questions)
         return split_sections(full)
