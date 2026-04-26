@@ -26,23 +26,34 @@ Role context:
 Application questions:
 {questions}
 
-Generate all of the following in markdown:
-1) Tailored headline
-2) Tailored summary (120-180 words)
-3) Top skills (10-14 items)
-4) Tailored experience bullets:
-   - SafeSend: 6-8 bullets
-   - Anakin: 3-4 bullets
-   - Cognizant: 2-3 bullets
-5) Relevant project bullets
-6) ATS keywords list
-7) Cover letter (concise, senior, factual)
-8) Application answers for each question (concise, direct)
-9) Optional follow-up email draft
+Return markdown only using EXACT top-level sections and order:
+1) ## Role Strategy
+2) ## Tailored Resume
+3) ## Cover Letter
+4) ## Application Answers
+5) ## Interview Prep
+
+Detailed requirements:
+- Role Strategy: positioning narrative (how Zack should position herself for this role).
+- Tailored Resume:
+  - Headline
+  - Summary (120-180 words)
+  - Top skills (10-14 items)
+  - SafeSend bullets (6-8)
+  - Anakin bullets (3-4)
+  - Cognizant bullets (2-3)
+  - Relevant project bullets
+  - ATS keywords
+- Cover Letter: concise, senior, factual.
+- Application Answers: concise direct responses for each application question.
+- Interview Prep:
+  - likely interview questions
+  - 3 STAR stories to use
+  - key metrics to mention
+  - questions to ask interviewer
 
 Tone:
 - senior, crisp, strategic
 - factual and defensible
-- avoid generic language
-- no exaggerated confidence claims
+- avoid generic language and overclaiming
 """.strip()

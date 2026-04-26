@@ -43,6 +43,18 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS job_timeline (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                job_id INTEGER NOT NULL,
+                status TEXT,
+                note TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(job_id) REFERENCES jobs(id)
+            )
+            """
+        )
 
 
 def add_job(payload: Dict[str, object]) -> int:
@@ -79,7 +91,12 @@ def add_job(payload: Dict[str, object]) -> int:
             f"INSERT INTO jobs ({', '.join(fields)}) VALUES ({', '.join(['?' for _ in fields])})",
             values,
         )
-        return int(cursor.lastrowid)
+        job_id = int(cursor.lastrowid)
+        conn.execute(
+            "INSERT INTO job_timeline (job_id, status, note, created_at) VALUES (?, ?, ?, ?)",
+            (job_id, payload.get("status", "Saved"), "Job added to tracker", now),
+        )
+        return job_id
 
 
 def update_job(job_id: int, updates: Dict[str, object]) -> None:
@@ -94,6 +111,23 @@ def update_job(job_id: int, updates: Dict[str, object]) -> None:
             f"UPDATE jobs SET {set_clause} WHERE id = ?",
             values + [job_id],
         )
+
+
+def add_timeline_note(job_id: int, status: str, note: str) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO job_timeline (job_id, status, note, created_at) VALUES (?, ?, ?, ?)",
+            (job_id, status, note, datetime.utcnow().isoformat(timespec="seconds")),
+        )
+
+
+def get_timeline(job_id: int) -> List[Dict[str, object]]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, job_id, status, note, created_at FROM job_timeline WHERE job_id = ? ORDER BY id DESC",
+            (job_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def get_job(job_id: int) -> Optional[Dict[str, object]]:

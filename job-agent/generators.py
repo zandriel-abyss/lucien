@@ -10,7 +10,15 @@ from anthropic import Anthropic
 from profile import PROFILE, RESUME_MODES, STAR_STORIES
 from prompts import build_generation_prompt, build_system_prompt
 
-OUTPUT_DIR = Path("outputs")
+OUTPUT_DIR = Path(__file__).resolve().parent / "outputs"
+SECTION_KEYS = ["role_strategy", "resume", "cover_letter", "application_answers", "interview_prep"]
+SECTION_HEADINGS = {
+    "role_strategy": "## Role Strategy",
+    "resume": "## Tailored Resume",
+    "cover_letter": "## Cover Letter",
+    "application_answers": "## Application Answers",
+    "interview_prep": "## Interview Prep",
+}
 
 
 class GeneratorService:
@@ -27,10 +35,12 @@ class GeneratorService:
         role_context: Dict[str, object],
         resume_mode: str,
         questions: List[str],
-    ) -> str:
+    ) -> Dict[str, str]:
         if self.client:
-            return self._generate_with_claude(role_context, resume_mode, questions)
-        return self._generate_mock(role_context, resume_mode, questions)
+            full = self._generate_with_claude(role_context, resume_mode, questions)
+        else:
+            full = self._generate_mock(role_context, resume_mode, questions)
+        return split_sections(full)
 
     def _generate_with_claude(
         self,
@@ -50,7 +60,7 @@ class GeneratorService:
 
         response = self.client.messages.create(
             model="claude-3-5-sonnet-latest",
-            max_tokens=2200,
+            max_tokens=2400,
             temperature=0.3,
             system=build_system_prompt(),
             messages=[{"role": "user", "content": prompt}],
@@ -70,21 +80,26 @@ class GeneratorService:
     ) -> str:
         headlines = RESUME_MODES[resume_mode]["headlines"]
         summary_focus = RESUME_MODES[resume_mode]["focus"]
+        keywords = ", ".join(role_context.get("keywords", [])) or "payments, platform, aml, kyc, compliance, ai, data"
 
-        q_section = "\n".join([f"- Q: {q}\n  A: Draft answer based on profile evidence." for q in questions]) or "- No questions provided."
+        q_section = "\n".join([f"- **Q:** {q}\n  **A:** Draft answer based on profile evidence." for q in questions]) or "- No questions provided."
 
         return f"""
-## Tailored Headline
+## Role Strategy
+Position as a senior fintech product leader who can scale regulated platforms while improving operating metrics. Lead with SafeSend portfolio modernization outcomes, then reinforce AI-enabled risk and onboarding experience from Anakin and strategic projects. Emphasize cross-functional execution with compliance, engineering, and commercial stakeholders across US/EU/APAC.
+
+## Tailored Resume
+### Headline
 {headlines[0]}
 
-## Tailored Summary
+### Summary
 Senior fintech product leader with 11+ years across platform modernization, regulated systems, and AI-enabled product transformation. {summary_focus} Brings cross-market execution across US, EU, and APAC with measurable outcomes in adoption, operating efficiency, quality, and release speed.
 
-## Top Skills
+### Top Skills
 Product strategy; Platform modernization; Payments; Treasury; AML/KYC; Compliance workflows; AI product delivery; Portfolio leadership; API-first architecture; GTM execution; Stakeholder management; Cross-functional scaling.
 
-## Tailored Experience Bullets
-### SafeSend
+### Tailored Experience Bullets
+#### SafeSend
 - Led strategy and delivery for a 7-product financial platform across tax workflows, payments, treasury, and compliance.
 - Re-architected fragmented legacy systems into a modular API-first platform for scale and maintainability.
 - Drove 64% product adoption growth and 35% operational efficiency gains through platform and workflow redesign.
@@ -92,22 +107,22 @@ Product strategy; Platform modernization; Payments; Treasury; AML/KYC; Complianc
 - Enabled AML/CFT, GDPR, and DORA-aligned workflows with audit-ready controls.
 - Supported ISO 20022-compatible processing across 50+ jurisdictions and cross-border operations.
 
-### Anakin
+#### Anakin
 - Built conversational AI onboarding for digital banks and PSPs integrating identity verification and compliance workflows.
 - Improved onboarding adoption by 45% and reduced bounce from 85% to 60%.
 - Designed NLP architecture with Dialogflow and Rasa, plus STT/VAD for voice-led interactions.
 
-### Cognizant
+#### Cognizant
 - Built regulatory QA frameworks for SWIFT/ACH payment systems in high-volume banking environments.
 - Reduced regression time by 60% while increasing coverage by 31%.
 - Translated AML requirements into testable system specifications and traceable controls.
 
-## Relevant Projects
+### Relevant Projects
 - Noir fraud detection framework: explainable ML risk signals and compliance-ready scoring.
 - AI treasury copilot: FX timing and liquidity support, validated with 15+ CFO interviews.
 
-## ATS Keywords
-{', '.join(role_context.get('keywords', [])) or 'payments, platform, aml, kyc, compliance, ai, data'}
+### ATS Keywords
+{keywords}
 
 ## Cover Letter
 Dear Hiring Team,
@@ -124,11 +139,50 @@ Zack
 ## Application Answers
 {q_section}
 
-## Follow-Up Email
-Subject: Follow-up on {role_context.get('title', 'application')} application
+## Interview Prep
+### Likely Interview Questions
+- Tell us about a platform modernization you led in a regulated environment.
+- How do you prioritize roadmap trade-offs across product, compliance, and engineering?
+- Describe your approach to AI-driven risk or onboarding systems.
+- How do you define and track product impact at portfolio level?
+- How do you align C-suite, compliance, and delivery teams on execution?
 
-Hi Hiring Team, I wanted to follow up on my application and reiterate my strong interest in the role. My background combines fintech product leadership, regulated systems execution, and measurable platform outcomes. Happy to share a concise portfolio of relevant work if useful.
+### STAR Stories to Use
+- SafeSend Transformation
+- Anakin Onboarding AI
+- Noir Fraud Detection Framework
+
+### Key Metrics to Mention
+- 64% adoption growth
+- 35% efficiency gains
+- 45% sprint velocity improvement
+- 59% QA defect reduction
+- 15% faster release timelines
+
+### Questions to Ask Interviewer
+- What business outcomes define success for this role in the first 6-12 months?
+- How are compliance and product priorities balanced in roadmap decisions?
+- Where are the largest execution bottlenecks today across teams?
+- Which customer or market segment is the top strategic focus this year?
 """.strip()
+
+
+def split_sections(content: str) -> Dict[str, str]:
+    sections: Dict[str, str] = {k: "" for k in SECTION_KEYS}
+    for idx, key in enumerate(SECTION_KEYS):
+        heading = SECTION_HEADINGS[key]
+        start = content.find(heading)
+        if start == -1:
+            continue
+        start += len(heading)
+        end = len(content)
+        if idx + 1 < len(SECTION_KEYS):
+            next_heading = SECTION_HEADINGS[SECTION_KEYS[idx + 1]]
+            next_pos = content.find(next_heading, start)
+            if next_pos != -1:
+                end = next_pos
+        sections[key] = content[start:end].strip()
+    return sections
 
 
 def save_output(company: str, title: str, content: str, output_type: str) -> str:
@@ -138,5 +192,5 @@ def save_output(company: str, title: str, content: str, output_type: str) -> str
     safe_title = "".join(c for c in title.lower().replace(" ", "-") if c.isalnum() or c == "-")
     filename = f"{ts}-{safe_company}-{safe_title}-{output_type}.md"
     path = OUTPUT_DIR / filename
-    path.write_text(content, encoding="utf-8")
+    path.write_text(content.strip() + "\n", encoding="utf-8")
     return str(path)
