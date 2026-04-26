@@ -59,8 +59,14 @@ if "generated_sections" not in st.session_state:
 if "ingested_jobs" not in st.session_state:
     st.session_state["ingested_jobs"] = []
 
-mode_label = "Live API" if st.session_state["generator"].api_available else "Mock only"
-st.info(f"Generation mode capability: {mode_label}")
+gen = st.session_state["generator"]
+if gen.provider == "ollama":
+    mode_label = f"Ollama ({gen.ollama_model})"
+elif gen.provider == "anthropic":
+    mode_label = "Anthropic API"
+else:
+    mode_label = "Mock only"
+st.info(f"Generation provider: {mode_label}")
 
 
 def parse_questions(raw: str) -> List[str]:

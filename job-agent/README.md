@@ -39,12 +39,19 @@ job-agent/
    - Windows (PowerShell): `.venv\Scripts\Activate.ps1`
 3. Install dependencies:
    - `pip install -r requirements.txt`
-4. Copy `.env.example` to `.env` in `job-agent/` and set:
-   - `ANTHROPIC_API_KEY=your_key_here`
+4. Copy `.env.example` to `.env` in `job-agent/` and set provider config.
 5. Run app:
    - `streamlit run app.py`
 
-If `ANTHROPIC_API_KEY` is missing, the app still works with a built-in mock generator.
+Default provider is **Ollama** (local, open-source model path).  
+If Ollama is unavailable or generation fails, the app falls back to a built-in mock generator.
+
+### Ollama setup (recommended)
+
+1. Install Ollama
+2. Pull a model:
+   - `ollama pull llama3.1:8b`
+3. Ensure Ollama is running locally on `http://localhost:11434`
 
 ## V2 Features
 
