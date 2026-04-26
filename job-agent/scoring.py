@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Dict, List
 
 ROLE_CATEGORIES = [
@@ -231,3 +232,47 @@ def score_fit(job_title: str, location: str, job_description: str, category: str
         resume_mode=resume_mode,
         breakdown=breakdown,
     )
+
+
+def compute_priority_score(
+    fit_score: int,
+    recommendation: str,
+    date_added: str | None,
+    source: str | None,
+    status: str | None,
+) -> int:
+    score = int(fit_score or 0)
+
+    rec_bonus = {
+        "Strong Apply": 20,
+        "Apply": 12,
+        "Maybe": 5,
+        "Skip": -10,
+    }.get((recommendation or "").strip(), 0)
+    score += rec_bonus
+
+    if (status or "") in {"Applied", "Interviewing", "Offer", "Archived", "Rejected"}:
+        score -= 15
+
+    source_txt = (source or "").lower()
+    if "linkedin" in source_txt:
+        score += 5
+    elif "rss" in source_txt:
+        score += 3
+
+    if date_added:
+        try:
+            dt = datetime.fromisoformat(str(date_added).replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            age_hours = (datetime.now(timezone.utc) - dt.astimezone(timezone.utc)).total_seconds() / 3600.0
+            if age_hours <= 24:
+                score += 12
+            elif age_hours <= 72:
+                score += 8
+            elif age_hours <= 168:
+                score += 4
+        except Exception:
+            pass
+
+    return max(0, min(100, int(round(score))))

@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from typing import Dict, List, Optional
 from urllib.error import URLError
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from urllib.request import Request, urlopen
 
 
@@ -27,6 +27,18 @@ class IngestedJob:
 
 def _safe_text(value: Optional[str]) -> str:
     return (value or "").strip()
+
+
+def _normalize_url(url: str) -> str:
+    raw = (url or "").strip()
+    if not raw:
+        return ""
+    try:
+        parsed = urlparse(raw)
+        clean_q = [(k, v) for k, v in parse_qsl(parsed.query, keep_blank_values=True) if not k.lower().startswith("utm_")]
+        return urlunparse((parsed.scheme, parsed.netloc, parsed.path.rstrip("/"), parsed.params, urlencode(clean_q), ""))
+    except Exception:
+        return raw
 
 
 def _extract_company_from_url(url: str) -> str:
@@ -66,7 +78,7 @@ def parse_csv_jobs(content: str, source: str = "CSV Import") -> List[IngestedJob
                 company=_safe_text(row.get("company")),
                 title=_safe_text(row.get("title")),
                 location=_safe_text(row.get("location")),
-                job_url=_safe_text(row.get("job_url") or row.get("url")),
+                job_url=_normalize_url(_safe_text(row.get("job_url") or row.get("url"))),
                 source=source,
                 job_description=_safe_text(row.get("job_description") or row.get("description")),
                 application_questions=_safe_text(row.get("application_questions") or row.get("questions")),
@@ -102,7 +114,7 @@ def parse_rss_jobs(rss_url: str, source: str = "RSS") -> List[IngestedJob]:
                 company=_extract_company_from_url(link),
                 title=title or "Untitled Role",
                 location="",
-                job_url=link,
+                job_url=_normalize_url(link),
                 source=source,
                 job_description=desc,
                 application_questions="",
@@ -124,7 +136,7 @@ def parse_rss_jobs(rss_url: str, source: str = "RSS") -> List[IngestedJob]:
                     company=_extract_company_from_url(link),
                     title=title or "Untitled Role",
                     location="",
-                    job_url=link,
+                    job_url=_normalize_url(link),
                     source=source,
                     job_description=summary,
                     application_questions="",
@@ -151,7 +163,7 @@ def parse_job_from_url(job_url: str, source: str = "Manual Career URL") -> Inges
         company=company,
         title=title,
         location="",
-        job_url=job_url,
+        job_url=_normalize_url(job_url),
         source=source,
         job_description=description,
         application_questions="",
@@ -228,3 +240,29 @@ def dedupe_jobs(
         seen.add(key)
         out.append(job)
     return out
+
+
+def normalize_ingested_jobs(jobs: List[IngestedJob]) -> Dict[str, object]:
+    valid: List[IngestedJob] = []
+    skipped = 0
+    for job in jobs:
+        company = _safe_text(job.company) or _extract_company_from_url(job.job_url)
+        title = _safe_text(job.title)
+        desc = _safe_text(job.job_description)
+        url = _normalize_url(job.job_url)
+        if not title or len(desc) < 40:
+            skipped += 1
+            continue
+        valid.append(
+            IngestedJob(
+                company=company or "Unknown",
+                title=title,
+                location=_safe_text(job.location),
+                job_url=url,
+                source=_safe_text(job.source) or "Imported",
+                job_description=desc,
+                application_questions=_safe_text(job.application_questions),
+                posted_at=job.posted_at,
+            )
+        )
+    return {"jobs": valid, "skipped": skipped}

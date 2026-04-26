@@ -48,6 +48,20 @@ STOPWORDS = {
     "using",
 }
 
+KEY_PHRASES = [
+    "transaction monitoring",
+    "financial crime",
+    "cross-border payments",
+    "product strategy",
+    "platform modernization",
+    "api-first",
+    "risk scoring",
+    "compliance workflows",
+    "stakeholder management",
+    "aml kyc",
+    "identity verification",
+]
+
 
 def _tokenize(text: str) -> List[str]:
     return re.findall(r"\b[a-z][a-z0-9\-]{2,}\b", (text or "").lower())
@@ -93,20 +107,35 @@ def extract_jd_keywords(job_description: str, limit: int = 25) -> List[str]:
 
 
 def ats_coverage_report(job_description: str) -> Dict[str, object]:
+    jd_text = (job_description or "").lower()
     jd_keywords = extract_jd_keywords(job_description)
-    matched = [k for k in jd_keywords if k in PROFILE_KEYWORDS]
-    missing = [k for k in jd_keywords if k not in PROFILE_KEYWORDS][:10]
-    coverage = int(round((len(matched) / max(len(jd_keywords), 1)) * 100))
+    jd_phrases = [p for p in KEY_PHRASES if p in jd_text]
+
+    profile_text = str(PROFILE).lower()
+    matched_keywords = [k for k in jd_keywords if k in PROFILE_KEYWORDS]
+    missing_keywords = [k for k in jd_keywords if k not in PROFILE_KEYWORDS][:10]
+    matched_phrases = [p for p in jd_phrases if p in profile_text]
+    missing_phrases = [p for p in jd_phrases if p not in profile_text][:6]
+
+    total_terms = len(jd_keywords) + len(jd_phrases)
+    total_matched = len(matched_keywords) + len(matched_phrases)
+    coverage = int(round((total_matched / max(total_terms, 1)) * 100))
 
     suggestions = [
         f"Emphasize experience related to '{kw}' with factual SafeSend/Anakin examples."
-        for kw in missing[:5]
+        for kw in missing_keywords[:5]
     ]
+    suggestions.extend(
+        [f"Add a concise bullet that directly references phrase '{ph}' if truthfully applicable." for ph in missing_phrases[:3]]
+    )
 
     return {
         "jd_keywords": jd_keywords,
-        "matched_keywords": matched,
-        "missing_keywords": missing,
+        "jd_phrases": jd_phrases,
+        "matched_keywords": matched_keywords,
+        "missing_keywords": missing_keywords,
+        "matched_phrases": matched_phrases,
+        "missing_phrases": missing_phrases,
         "coverage_percent": coverage,
         "suggestions": suggestions,
     }

@@ -8,10 +8,10 @@ import streamlit as st
 from dotenv import load_dotenv
 
 from generators import GeneratorService, save_output
-from ingestion import dedupe_jobs, filter_recent_jobs, parse_csv_jobs, parse_job_from_url, parse_rss_jobs
+from ingestion import dedupe_jobs, filter_recent_jobs, normalize_ingested_jobs, parse_csv_jobs, parse_job_from_url, parse_rss_jobs
 from optimizer import ats_coverage_report, build_apply_checklist
 from profile import PROFILE, RESUME_MODES, STAR_STORIES
-from scoring import classify_role, score_fit
+from scoring import classify_role, compute_priority_score, score_fit
 from tracker import (
     add_job,
     add_timeline_note,
@@ -152,9 +152,19 @@ def render_dashboard() -> None:
         parsed = pd.to_datetime(view["date_added"], errors="coerce", utc=True)
         view = view[parsed >= cutoff]
 
-    view = view.sort_values(by=["fit_score", "id"], ascending=[False, False])
+    view["priority_score"] = view.apply(
+        lambda r: compute_priority_score(
+            fit_score=int(r.get("fit_score") or 0),
+            recommendation=str(r.get("recommendation") or ""),
+            date_added=str(r.get("date_added") or ""),
+            source=str(r.get("source") or ""),
+            status=str(r.get("status") or ""),
+        ),
+        axis=1,
+    )
+    view = view.sort_values(by=["priority_score", "fit_score", "id"], ascending=[False, False, False])
     st.dataframe(
-        view[["id", "company", "title", "location", "source", "category", "fit_score", "recommendation", "resume_mode", "last_generation_mode", "status", "date_added"]],
+        view[["id", "company", "title", "location", "source", "category", "fit_score", "priority_score", "recommendation", "resume_mode", "last_generation_mode", "status", "date_added"]],
         use_container_width=True,
     )
 
@@ -214,11 +224,15 @@ def render_ingestion() -> None:
         if uploaded is not None:
             content = uploaded.read().decode("utf-8", errors="ignore")
             jobs = parse_csv_jobs(content)
+            normalized = normalize_ingested_jobs(jobs)
+            jobs = normalized["jobs"]
             window = st.selectbox("Recency filter", options=["24h", "3d", "7d"], key="csv-window")
             jobs = filter_recent_jobs(jobs, window)
             jobs = dedupe_jobs(jobs, list_jobs())
             st.session_state["ingested_jobs"] = jobs
             st.success(f"Parsed {len(jobs)} new jobs after dedupe/filter.")
+            if normalized["skipped"]:
+                st.warning(f"Skipped {normalized['skipped']} rows with missing title or weak description.")
 
     with tab2:
         rss_url = st.text_input("RSS Feed URL", key="rss-url")
@@ -226,10 +240,14 @@ def render_ingestion() -> None:
         if st.button("Fetch RSS Jobs"):
             try:
                 jobs = parse_rss_jobs(rss_url, source="RSS")
+                normalized = normalize_ingested_jobs(jobs)
+                jobs = normalized["jobs"]
                 jobs = filter_recent_jobs(jobs, window)
                 jobs = dedupe_jobs(jobs, list_jobs())
                 st.session_state["ingested_jobs"] = jobs
                 st.success(f"Fetched {len(jobs)} new jobs.")
+                if normalized["skipped"]:
+                    st.warning(f"Skipped {normalized['skipped']} low-quality feed entries.")
             except Exception as exc:
                 st.error(str(exc))
 
@@ -238,9 +256,12 @@ def render_ingestion() -> None:
         if st.button("Parse URL"):
             try:
                 job = parse_job_from_url(url)
-                jobs = dedupe_jobs([job], list_jobs())
+                normalized = normalize_ingested_jobs([job])
+                jobs = dedupe_jobs(normalized["jobs"], list_jobs())
                 st.session_state["ingested_jobs"] = jobs
                 st.success(f"Parsed {len(jobs)} new jobs.")
+                if normalized["skipped"]:
+                    st.warning("Parsed URL content was too short to use as a reliable job description.")
             except Exception as exc:
                 st.error(str(exc))
 
@@ -328,6 +349,8 @@ def render_job_detail() -> None:
     c3.metric("Missing keywords", len(ats["missing_keywords"]))
 
     st.write("**Keywords to include:**", ", ".join(ats["jd_keywords"][:20]) or "-")
+    if ats.get("jd_phrases"):
+        st.write("**High-value JD phrases:**", ", ".join(ats["jd_phrases"][:10]))
     if ats["suggestions"]:
         st.write("**Optimization suggestions:**")
         for line in ats["suggestions"]:
