@@ -1,9 +1,0 @@
-{% extends "base.html" %}
-{% block content %}
-<p><a href="/jobs/{{ job.id }}">← Back to job</a></p>
-<h1>Resume Diff — {{ job.company }} / {{ job.title }}</h1>
-<div class="card">
-  <p>Review changes carefully. This is draft content and should be human-validated before use.</p>
-  {{ diff_table | safe }}
-</div>
-{% endblock %}
