@@ -22,13 +22,13 @@ class FitScorer:
     }
 
     WEIGHTS = {
-        "fintech_payments": 0.2,
-        "ai_data": 0.15,
-        "compliance_regtech": 0.15,
-        "product_leadership": 0.2,
+        "fintech_payments": 0.24,
+        "ai_data": 0.14,
+        "compliance_regtech": 0.2,
+        "product_leadership": 0.19,
         "seniority": 0.1,
-        "location_visa": 0.1,
-        "dutch_language_requirement": 0.1,
+        "location_visa": 0.08,
+        "dutch_language_requirement": 0.05,
     }
 
     def __init__(self, profile_path: Path) -> None:

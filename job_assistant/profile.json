@@ -1,14 +1,46 @@
 {
-  "name": "Candidate Name",
-  "target_roles": ["Senior Product Leader", "Head of Product", "Director of Product"],
-  "location": "Netherlands",
-  "visa_status": "Specify visa details",
-  "languages": ["English"],
-  "domains": ["Fintech", "Payments", "AI", "Compliance"],
+  "name": "Jzacksline Andreela Soosaiya",
+  "preferred_name": "Zack",
+  "headline": "FinTech Product Leader | AI & Compliance Innovation",
+  "location": "Amsterdam, Netherlands",
+  "experience_years": 11,
+  "target_roles": [
+    "Senior Product Manager",
+    "Staff Product Manager",
+    "Group Product Manager",
+    "Head of Product",
+    "Director of Product",
+    "Compliance Operations Manager",
+    "RegTech Transformation Manager",
+    "AI Product Manager",
+    "Payments Product Manager"
+  ],
+  "domains": [
+    "FinTech",
+    "Payments",
+    "Compliance",
+    "AML/KYC",
+    "RegTech",
+    "AI/ML",
+    "Fraud Detection",
+    "Treasury",
+    "Platform Products"
+  ],
   "strengths": [
-    "Product strategy and execution",
+    "Product strategy",
+    "Platform modernization",
+    "API-first architecture",
+    "Financial systems",
+    "AI-driven fraud detection",
     "Cross-functional leadership",
-    "Data-informed prioritization",
-    "Regulated market delivery"
+    "Discovery-to-delivery operations",
+    "Regulated product environments"
+  ],
+  "key_metrics": [
+    "64% product adoption growth",
+    "35% operational efficiency improvement",
+    "59% QA defect reduction",
+    "45% sprint velocity improvement",
+    "15% release timeline reduction"
   ]
 }
