@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
+job_assistant/jobs.db
+job_assistant/generated_outputs/*.md
+!job_assistant/generated_outputs/.gitkeep

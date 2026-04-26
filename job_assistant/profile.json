@@ -1,0 +1,14 @@
+{
+  "name": "Candidate Name",
+  "target_roles": ["Senior Product Leader", "Head of Product", "Director of Product"],
+  "location": "Netherlands",
+  "visa_status": "Specify visa details",
+  "languages": ["English"],
+  "domains": ["Fintech", "Payments", "AI", "Compliance"],
+  "strengths": [
+    "Product strategy and execution",
+    "Cross-functional leadership",
+    "Data-informed prioritization",
+    "Regulated market delivery"
+  ]
+}
