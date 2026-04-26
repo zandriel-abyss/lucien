@@ -46,6 +46,14 @@ job-agent/
 Default provider is **Ollama** (local, open-source model path).  
 If Ollama is unavailable or generation fails, the app falls back to a built-in mock generator.
 
+### Optional OpenAI provider
+
+Set in `.env`:
+
+- `JOB_AGENT_LLM_PROVIDER=openai`
+- `OPENAI_API_KEY=...`
+- `OPENAI_MODEL=gpt-4o-mini` (or another compatible model)
+
 ### Ollama setup (recommended)
 
 1. Install Ollama

@@ -62,6 +62,8 @@ if "ingested_jobs" not in st.session_state:
 gen = st.session_state["generator"]
 if gen.provider == "ollama":
     mode_label = f"Ollama ({gen.ollama_model})"
+elif gen.provider == "openai":
+    mode_label = f"OpenAI ({gen.openai_model})"
 elif gen.provider == "anthropic":
     mode_label = "Anthropic API"
 else:

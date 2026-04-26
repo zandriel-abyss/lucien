@@ -32,6 +32,8 @@ class GeneratorService:
         self.provider = (os.getenv("JOB_AGENT_LLM_PROVIDER") or "ollama").strip().lower()
         self.api_key = os.getenv("ANTHROPIC_API_KEY")
         self.client = Anthropic(api_key=self.api_key) if (self.api_key and Anthropic and self.provider == "anthropic") else None
+        self.openai_api_key = os.getenv("OPENAI_API_KEY")
+        self.openai_model = os.getenv("OPENAI_MODEL") or "gpt-4o-mini"
         self.ollama_base_url = (os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434").rstrip("/")
         self.ollama_model = os.getenv("OLLAMA_MODEL") or "llama3.1:8b"
         self.last_generation_mode = "mock"
@@ -41,6 +43,8 @@ class GeneratorService:
     def api_available(self) -> bool:
         if self.provider == "anthropic":
             return bool(self.client)
+        if self.provider == "openai":
+            return bool(self.openai_api_key)
         if self.provider == "ollama":
             return True
         return False
@@ -55,6 +59,10 @@ class GeneratorService:
             if self.provider == "anthropic" and self.client:
                 full = self._generate_with_claude(role_context, resume_mode, questions)
                 self.last_generation_mode = "live-anthropic"
+                self.last_generation_error = ""
+            elif self.provider == "openai" and self.openai_api_key:
+                full = self._generate_with_openai(role_context, resume_mode, questions)
+                self.last_generation_mode = "live-openai"
                 self.last_generation_error = ""
             elif self.provider == "ollama":
                 full = self._generate_with_ollama(role_context, resume_mode, questions)
@@ -136,6 +144,51 @@ class GeneratorService:
         content = ((body.get("message") or {}).get("content") or "").strip()
         if not content:
             raise RuntimeError("Ollama returned empty content")
+        return content
+
+    def _generate_with_openai(
+        self,
+        role_context: Dict[str, object],
+        resume_mode: str,
+        questions: List[str],
+    ) -> str:
+        prompt = build_generation_prompt(
+            profile={
+                "profile": PROFILE,
+                "resume_mode": RESUME_MODES.get(resume_mode, {}),
+                "star_stories": STAR_STORIES,
+            },
+            role_context=role_context,
+            questions=questions,
+        )
+        payload = {
+            "model": self.openai_model,
+            "messages": [
+                {"role": "system", "content": build_system_prompt()},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.3,
+        }
+        req = Request(
+            "https://api.openai.com/v1/chat/completions",
+            method="POST",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.openai_api_key}",
+            },
+        )
+        try:
+            with urlopen(req, timeout=120) as resp:
+                body = json.loads(resp.read().decode("utf-8"))
+        except URLError as exc:
+            raise RuntimeError(f"OpenAI connection failed: {exc}")
+        choices = body.get("choices") or []
+        if not choices:
+            raise RuntimeError("OpenAI returned no choices")
+        content = (((choices[0] or {}).get("message") or {}).get("content") or "").strip()
+        if not content:
+            raise RuntimeError("OpenAI returned empty content")
         return content
 
     def _generate_mock(
