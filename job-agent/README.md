@@ -9,7 +9,7 @@ This tool is **not** a blind auto-apply bot. It prepares strong materials for ma
 - Python
 - Streamlit
 - SQLite
-- Anthropic Claude API (`ANTHROPIC_API_KEY`)
+- LLM providers: Ollama (default), OpenAI (optional), Anthropic (optional)
 - Modular code architecture
 
 ## Project Structure
@@ -84,14 +84,18 @@ Set in `.env`:
 ### Optimization
 
 - JD keyword extraction
-- ATS coverage report
+- ATS keyword + phrase coverage report
 - Missing keyword suggestions for factual tailoring
+- Priority queue score (fit + recency + source + status)
 
 ### Apply Assistant (manual final submit)
 
 - LinkedIn/company portal checklist
 - Additional portal question answering
 - Status update to `Applied` after manual submit
+- Application Session cockpit with quality gate checks
+- Reusable answer bank by question type
+- D+3 / D+7 follow-up message drafts and export
 
 ## Guardrails
 

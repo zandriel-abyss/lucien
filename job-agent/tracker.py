@@ -57,6 +57,20 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS answer_bank (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                question_type TEXT NOT NULL,
+                question_text TEXT NOT NULL,
+                answer_text TEXT NOT NULL,
+                job_id INTEGER,
+                quality_score INTEGER,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(job_id) REFERENCES jobs(id)
+            )
+            """
+        )
         cols = {
             row["name"]
             for row in conn.execute("PRAGMA table_info(jobs)").fetchall()
@@ -166,3 +180,74 @@ def status_counts() -> Dict[str, int]:
 def export_csv() -> pd.DataFrame:
     data = list_jobs()
     return pd.DataFrame(data)
+
+
+def infer_question_type(question: str) -> str:
+    q = (question or "").lower()
+    if "why this company" in q or ("why" in q and "company" in q):
+        return "why_company"
+    if "why this role" in q or ("why" in q and "role" in q):
+        return "why_role"
+    if "impact" in q or "kpi" in q or "result" in q:
+        return "impact"
+    if "stakeholder" in q:
+        return "stakeholder"
+    if "leadership" in q or "team" in q:
+        return "leadership"
+    if "aml" in q or "kyc" in q or "compliance" in q:
+        return "compliance"
+    if "ai" in q or "ml" in q or "data" in q:
+        return "ai_data"
+    if "payment" in q or "treasury" in q:
+        return "payments"
+    return "general"
+
+
+def add_answer_bank_entry(
+    question_type: str,
+    question_text: str,
+    answer_text: str,
+    job_id: int | None = None,
+    quality_score: int | None = None,
+) -> int:
+    with get_conn() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO answer_bank
+            (question_type, question_text, answer_text, job_id, quality_score, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                question_type,
+                question_text.strip(),
+                answer_text.strip(),
+                job_id,
+                quality_score,
+                datetime.utcnow().isoformat(timespec="seconds"),
+            ),
+        )
+        return int(cursor.lastrowid)
+
+
+def get_answer_bank(question_type: str | None = None, limit: int = 20) -> List[Dict[str, object]]:
+    with get_conn() as conn:
+        if question_type:
+            rows = conn.execute(
+                """
+                SELECT * FROM answer_bank
+                WHERE question_type = ?
+                ORDER BY COALESCE(quality_score, 0) DESC, id DESC
+                LIMIT ?
+                """,
+                (question_type, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT * FROM answer_bank
+                ORDER BY COALESCE(quality_score, 0) DESC, id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+    return [dict(r) for r in rows]
