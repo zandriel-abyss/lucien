@@ -12,6 +12,8 @@ from urllib.error import URLError
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from urllib.request import Request, urlopen
 
+from pypdf import PdfReader
+
 
 @dataclass
 class IngestedJob:
@@ -266,3 +268,18 @@ def normalize_ingested_jobs(jobs: List[IngestedJob]) -> Dict[str, object]:
             )
         )
     return {"jobs": valid, "skipped": skipped}
+
+
+def extract_text_from_pdf(pdf_bytes: bytes) -> str:
+    try:
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+    except Exception as exc:
+        raise RuntimeError(f"Unable to read PDF: {exc}")
+
+    pages: List[str] = []
+    for page in reader.pages:
+        text = page.extract_text() or ""
+        cleaned = re.sub(r"\s+", " ", text).strip()
+        if cleaned:
+            pages.append(cleaned)
+    return "\n".join(pages).strip()

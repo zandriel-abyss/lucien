@@ -8,7 +8,7 @@ import streamlit as st
 from dotenv import load_dotenv
 
 from generators import GeneratorService, save_output
-from ingestion import dedupe_jobs, filter_recent_jobs, normalize_ingested_jobs, parse_csv_jobs, parse_job_from_url, parse_rss_jobs
+from ingestion import dedupe_jobs, extract_text_from_pdf, filter_recent_jobs, normalize_ingested_jobs, parse_csv_jobs, parse_job_from_url, parse_rss_jobs
 from optimizer import ats_coverage_report, build_apply_checklist
 from profile import PROFILE, RESUME_MODES, STAR_STORIES
 from scoring import classify_role, compute_priority_score, score_fit
@@ -61,6 +61,8 @@ if "generated_sections" not in st.session_state:
 
 if "ingested_jobs" not in st.session_state:
     st.session_state["ingested_jobs"] = []
+if "uploaded_resume_text" not in st.session_state:
+    st.session_state["uploaded_resume_text"] = ""
 
 gen = st.session_state["generator"]
 if gen.provider == "ollama":
@@ -271,10 +273,10 @@ def render_add_job() -> None:
 
 
 def render_ingestion() -> None:
-    st.subheader("Ingestion (CSV / RSS / Career URL)")
+    st.subheader("Ingestion (CSV / RSS / Career URL / Resume PDF)")
     st.caption("Use user-triggered imports only. Avoid automated login scraping and never auto-apply.")
 
-    tab1, tab2, tab3 = st.tabs(["CSV Import", "RSS Feed", "Career URL"])
+    tab1, tab2, tab3, tab4 = st.tabs(["CSV Import", "RSS Feed", "Career URL", "Resume PDF"])
 
     with tab1:
         uploaded = st.file_uploader("Upload CSV", type=["csv"])
@@ -322,6 +324,31 @@ def render_ingestion() -> None:
                     st.warning("Parsed URL content was too short to use as a reliable job description.")
             except Exception as exc:
                 st.error(str(exc))
+
+    with tab4:
+        st.caption("Upload a PDF resume for additional tailoring context.")
+        resume_pdf = st.file_uploader("Upload Resume PDF", type=["pdf"], key="resume-pdf-upload")
+        if resume_pdf is not None:
+            try:
+                extracted = extract_text_from_pdf(resume_pdf.getvalue())
+                if extracted:
+                    st.session_state["uploaded_resume_text"] = extracted
+                    st.success(f"Resume text extracted ({len(extracted)} characters).")
+                else:
+                    st.warning("PDF uploaded, but no text could be extracted.")
+            except Exception as exc:
+                st.error(str(exc))
+
+        if st.session_state["uploaded_resume_text"]:
+            st.text_area(
+                "Extracted Resume Text (editable session context)",
+                key="resume-text-preview",
+                value=st.session_state["uploaded_resume_text"],
+                height=180,
+            )
+            if st.button("Save Edited Resume Context", key="save-resume-context"):
+                st.session_state["uploaded_resume_text"] = st.session_state["resume-text-preview"]
+                st.success("Saved resume context for this session.")
 
     jobs = st.session_state.get("ingested_jobs", [])
     if jobs:
@@ -465,6 +492,7 @@ def render_job_detail() -> None:
             "strengths": fit.strengths,
             "gaps": fit.gaps,
             "job_description": job.get("job_description"),
+            "uploaded_resume_text": st.session_state.get("uploaded_resume_text", ""),
         }
         questions = parse_questions(job.get("application_questions") or "")
         with st.spinner("Generating package..."):
@@ -582,6 +610,7 @@ def render_apply_assistant() -> None:
             "strengths": score_fit(job.get("title") or "", job.get("location") or "", job.get("job_description") or "", job.get("category") or "General Leadership").strengths,
             "gaps": score_fit(job.get("title") or "", job.get("location") or "", job.get("job_description") or "", job.get("category") or "General Leadership").gaps,
             "job_description": job.get("job_description"),
+            "uploaded_resume_text": st.session_state.get("uploaded_resume_text", ""),
         }
         extra_questions = parse_questions(portal_questions)
         if not extra_questions:

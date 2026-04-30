@@ -68,6 +68,7 @@ Set in `.env`:
 - CSV job import
 - RSS feed ingestion
 - Manual career page URL parsing
+- Resume PDF text extraction for additional tailoring context
 - Recency filters (`24h`, `3d`, `7d`)
 - Dedupe against tracker by `company + title + job_url`
 
