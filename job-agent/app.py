@@ -14,10 +14,13 @@ from profile import PROFILE, RESUME_MODES, STAR_STORIES
 from scoring import classify_role, compute_priority_score, score_fit
 from tracker import (
     add_job,
+    add_answer_bank_entry,
     add_timeline_note,
     export_csv,
+    get_answer_bank,
     get_job,
     get_timeline,
+    infer_question_type,
     init_db,
     list_jobs,
     status_counts,
@@ -87,6 +90,61 @@ def append_generated_file(job: Dict[str, object], new_path: str) -> str:
     if new_path not in current:
         current.append(new_path)
     return "\n".join(current)
+
+
+def quality_gate_checks(job: Dict[str, object], sections: Dict[str, str], ats: Dict[str, object]) -> List[Dict[str, str]]:
+    checks: List[Dict[str, str]] = []
+    checks.append(
+        {
+            "name": "Required job fields",
+            "status": "pass" if job.get("company") and job.get("title") else "fail",
+            "detail": "Company and title must be present.",
+        }
+    )
+    checks.append(
+        {
+            "name": "Resume draft present",
+            "status": "pass" if sections.get("resume", "").strip() else "fail",
+            "detail": "Generate or edit resume section before submit.",
+        }
+    )
+    checks.append(
+        {
+            "name": "Application answers present",
+            "status": "pass" if sections.get("application_answers", "").strip() else "warn",
+            "detail": "Answers section is recommended before submitting.",
+        }
+    )
+    checks.append(
+        {
+            "name": "ATS coverage threshold",
+            "status": "pass" if int(ats.get("coverage_percent", 0)) >= 35 else "warn",
+            "detail": f"Current ATS coverage: {ats.get('coverage_percent', 0)}%",
+        }
+    )
+    if (job.get("last_generation_mode") or "").startswith("mock"):
+        checks.append(
+            {
+                "name": "Live generation mode",
+                "status": "warn",
+                "detail": "Latest generation used mock fallback.",
+            }
+        )
+    return checks
+
+
+def generate_followup_messages(job: Dict[str, object]) -> Dict[str, str]:
+    company = job.get("company") or "the company"
+    title = job.get("title") or "the role"
+    d3 = (
+        f"Hi Hiring Team, following up on my {title} application at {company}. "
+        "I remain very interested and would be glad to share additional context on relevant platform, payments, and compliance outcomes."
+    )
+    d7 = (
+        f"Hi Hiring Team, I wanted to check in again regarding my {title} application at {company}. "
+        "If helpful, I can provide a concise brief of measurable product outcomes and leadership examples aligned to this role."
+    )
+    return {"d3": d3, "d7": d7}
 
 
 def _build_job_payload(company: str, title: str, location: str, job_url: str, source: str, jd: str, questions: str, recruiter: str = "", notes: str = "", follow_up_date: str | None = None) -> Dict[str, object]:
@@ -552,6 +610,77 @@ def render_apply_assistant() -> None:
         st.success("Status updated to Applied.")
 
 
+def render_application_session() -> None:
+    st.subheader("Application Session")
+    st.caption("Single-job submission cockpit: quality gate, answer bank, and follow-up drafting.")
+
+    jobs = list_jobs()
+    if not jobs:
+        st.info("No jobs available.")
+        return
+
+    job_options = {f"#{j['id']} - {j['company']} - {j['title']}": j["id"] for j in jobs}
+    selected_label = st.selectbox("Select job", options=list(job_options.keys()), key="session-job")
+    job = get_job(job_options[selected_label])
+    if not job:
+        st.warning("Job not found.")
+        return
+
+    sections = get_job_sections(job["id"])
+    ats = ats_coverage_report(job.get("job_description") or "")
+    checks = quality_gate_checks(job, sections, ats)
+
+    st.markdown("### Submission Quality Gate")
+    for check in checks:
+        icon = "✅" if check["status"] == "pass" else "⚠️" if check["status"] == "warn" else "❌"
+        st.write(f"{icon} **{check['name']}** - {check['detail']}")
+
+    st.markdown("### Reusable Answer Bank")
+    question = st.text_input("Portal question")
+    q_type = infer_question_type(question) if question else "general"
+    st.write(f"Detected question type: `{q_type}`")
+    bank_rows = get_answer_bank(q_type, limit=5)
+    if bank_rows:
+        st.write("Top reusable answers:")
+        for row in bank_rows:
+            st.write(f"- {row['answer_text'][:240]}...")
+    else:
+        st.write("No saved answers for this type yet.")
+
+    answer_draft = st.text_area("Draft answer to save/reuse", height=140)
+    quality = st.slider("Answer quality score", min_value=1, max_value=5, value=4)
+    if st.button("Save to Answer Bank"):
+        if not question.strip() or not answer_draft.strip():
+            st.warning("Question and answer are required.")
+        else:
+            add_answer_bank_entry(
+                question_type=q_type,
+                question_text=question.strip(),
+                answer_text=answer_draft.strip(),
+                job_id=job["id"],
+                quality_score=quality,
+            )
+            add_timeline_note(job["id"], job.get("status") or "Drafted", f"Saved reusable answer ({q_type})")
+            st.success("Saved to answer bank.")
+
+    st.markdown("### Follow-up Message Variants")
+    followups = generate_followup_messages(job)
+    d3 = st.text_area("D+3 follow-up", value=followups["d3"], height=100)
+    d7 = st.text_area("D+7 follow-up", value=followups["d7"], height=100)
+
+    c1, c2 = st.columns(2)
+    if c1.button("Save D+3 Follow-up"):
+        path = save_output(job["company"], job["title"], d3, "followup-d3")
+        update_job(job["id"], {"generated_files": append_generated_file(job, path)})
+        add_timeline_note(job["id"], job.get("status") or "Drafted", "Saved D+3 follow-up message")
+        st.success(f"Saved D+3 follow-up to {path}")
+    if c2.button("Save D+7 Follow-up"):
+        path = save_output(job["company"], job["title"], d7, "followup-d7")
+        update_job(job["id"], {"generated_files": append_generated_file(job, path)})
+        add_timeline_note(job["id"], job.get("status") or "Drafted", "Saved D+7 follow-up message")
+        st.success(f"Saved D+7 follow-up to {path}")
+
+
 def render_export() -> None:
     st.subheader("Tracker Export")
     df = export_csv()
@@ -590,6 +719,7 @@ pages = {
     "Job Detail": render_job_detail,
     "Outputs": render_outputs,
     "Apply Assistant": render_apply_assistant,
+    "Application Session": render_application_session,
     "Tracker Export": render_export,
     "Profile": render_profile,
 }
